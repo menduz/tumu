@@ -1,0 +1,14 @@
+{
+  "name": "tumu",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:tcoats/tumu.git",
+  "author": "Thomas Coats <github@voodoolabs.net>",
+  "license": "MIT",
+  "bin": {
+    "tumu": "bin/cli.js"
+  },
+  "dependencies": {
+    "commander": "^2.19.0"
+  }
+}
