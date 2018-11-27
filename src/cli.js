@@ -32,13 +32,22 @@ const hostHelp = () => console.error(`
   1. Passing --host to this command
   2. Specifying a TUMU_HOST environment variable
   3. Or setting TUMU_HOST in an .env file
+
+
+  If you want to setup a tumu host follow the instructions here
+  https://github.com/tcoats/tumu-host
+
 `)
 const appHelp = () => console.error(`
-  The app to connect to is not specified — please fix by:
+  The app is not specified — please fix by:
 
   1. passing --app to this command
   2. Specifying a TUMU_APP environment variable
   3. Or setting TUMU_APP in an .env file
+
+
+  If you need a new app run \`tumu new\`
+
 `)
 
 program
@@ -131,7 +140,7 @@ program
         clearInterval(handle)
         process.stdout.clearLine()
         process.stdout.cursorTo(0)
-        console.log(`  Published to ${app}\n`)
+        console.log(`  Published ${app} to ${host}\n`)
         return
       }
       process.stdout.clearLine()
@@ -164,7 +173,13 @@ program
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
     // TODO: communicate with host
-    console.log(`\n  Streaming logs from ${app}...\n`)
+    console.log(`\nStreaming logs from ${app}...\n`)
+    let count = 1
+    console.log(count)
+    setInterval(() => {
+      count++
+      console.log(count)
+    }, 1000)
   })
 
 program
