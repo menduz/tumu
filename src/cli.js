@@ -2,12 +2,13 @@ require('dotenv').config()
 const program = require('commander')
 const version = require('../package.json').version
 const { homedir } = require('os')
-const path = require('path')
+const { join } = require('path')
 const fs = require('fs')
 const readline = require('readline')
+const WebSocket = require('ws')
 
 let config = { hosts: {} }
-const configPath = path.join(homedir(), '.tumu.json')
+const configPath = join(homedir(), '.tumu.json')
 const writeConfig = () =>
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
 const readConfig = () =>
@@ -50,6 +51,78 @@ const appHelp = () => console.error(`
 
 `)
 
+const fixHostUrl = (host) => {
+  if (!host) return host
+  if (host.indexOf('ws://') == -1) return `ws://${host}`
+  return host
+}
+const oneshot = (host, token, command, params) => new Promise((resolve, reject) => {
+  let fin = false
+  const socket = new WebSocket(host, { headers: { Token: token }})
+    socket.on('open', (req) => socket.send(JSON.stringify([command, params])))
+    socket.on('error', (err) => {
+      if (fin) return
+      socket.terminate()
+      reject(err)
+    })
+
+    socket.on('message', (data) => {
+      let payload = null
+      try { payload = JSON.parse(data) }
+      catch (e) {
+        socket.terminate()
+        reject('protocol violation')
+        return
+      }
+      if (!Array.isArray(payload) || payload.length != 2 || payload[0] != command) {
+        socket.terminate()
+        reject('protocol violation')
+        return
+      }
+      socket.terminate()
+      resolve(payload[1])
+    })
+})
+const connection = (host, token, callbacks) => {
+  let fin = false
+  const socket = new WebSocket(host, { headers: { Token: token }})
+    socket.on('open', () => callbacks.open())
+    socket.on('error', (err) => {
+      if (fin) return
+      socket.terminate()
+      callbacks.error(err)
+    })
+
+    socket.on('message', (data) => {
+      let payload = null
+      try { payload = JSON.parse(data) }
+      catch (e) {
+        socket.terminate()
+        callbacks.error('protocol violation')
+        return
+      }
+      if (!Array.isArray(payload) || payload.length != 2) {
+        socket.terminate()
+        callbacks.error('protocol violation')
+        return
+      }
+      if (callbacks[payload[0]]) callbacks[payload[0]](payload[1])
+      else callbacks.error('protocol violation')
+    })
+  return {
+    send: (command, params) => socket.send(JSON.stringify([command, params])),
+    close: () => socket.terminate()
+  }
+}
+const socketError = (err) => {
+  if (err.code == 'ECONNREFUSED')
+    console.error(`\n  Connection to tumu host refused`)
+
+  console.error()
+  console.error(err)
+  console.error()
+}
+
 program
   .command('login [host]')
   .description('authenticate with a tumu host')
@@ -60,18 +133,50 @@ program
   .action((host, cmd) => {
     if (!host) host = process.env.TUMU_HOST
     if (!host) return hostHelp()
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    })
-    rl.question(`\n  Logging into ${host}\n\n  Type email address: `, (emailAddress) => {
-      rl.close()
-      // TODO: Communication with the server to generate one time code
-      // Then one time code verification to generate token
-      if (!config.hosts[host]) config.hosts[host] = {}
-      config.hosts[host].token = emailAddress
-      writeConfig()
-      console.log(`\n  Successfully logged into ${host}\n`)
+    host = fixHostUrl(host)
+    if (!config.hosts[host]) config.hosts[host] = {}
+    if (config.hosts[host].token)
+      return console.log(`\n  Currently logged into ${host}\n`)
+    console.log(`\n  Logging into ${host}\n`)
+    const getEmailAddress = config.hosts[host].emailAddress
+      ? Promise.resolve(config.hosts[host].emailAddress)
+      : new Promise((resolve, reject) => {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+        rl.question(`  Type email address: `, (emailAddress) => {
+          rl.close()
+          resolve(emailAddress)
+        })
+      })
+    getEmailAddress.then((emailAddress) => {
+      const socket = connection(host, null, {
+        open: () => socket.send('login', emailAddress),
+        error: socketError,
+        login: (token) => {
+          socket.close()
+          config.hosts[host].emailAddress = emailAddress
+          config.hosts[host].token = token
+          writeConfig()
+          console.log(`\n  Successfully logged into ${host}\n`)
+        },
+        secret: (secret) => {
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+          rl.question(`\n  Here is your authenticator secret\n  Use this secret to generate a one time code\n  ${secret}\n\n  Type authenticator code: `, (code) => {
+            rl.close()
+            socket.send('code', { emailAddress, code })
+          })
+        },
+        challenge: () => {
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+          rl.question(`  Type authenticator code: `, (code) => {
+            rl.close()
+            socket.send('code', { emailAddress, code })
+          })
+        },
+        failed: () => {
+          socket.close()
+          console.error('\n  Authentication failed\n')
+        }
+      })
     })
   })
 
@@ -81,9 +186,28 @@ program
   .action((host, cmd) => {
     if (!host) host = process.env.TUMU_HOST
     if (!host) return hostHelp()
-    if (config.hosts[host]) delete config.hosts[host].token
-    // TODO: communicate with host to invalidate token
-    console.log(`\n  Logged out of ${host}\n`)
+    host = fixHostUrl(host)
+    if (!config.hosts[host] || !config.hosts[host].token) {
+      if (config.hosts[host]) {
+        delete config.hosts[host]
+        writeConfig()
+      }
+      return console.log(`\n  Logged out of ${host}\n`)
+    }
+    const token = config.hosts[host].token
+    const socket = connection(host, token, {
+      open: () => socket.send('logout', {
+        emailAddress: config.hosts[host].emailAddress,
+        token: config.hosts[host].token
+      }),
+      error: socketError,
+      logout: () => {
+        socket.close()
+        delete config.hosts[host]
+        writeConfig()
+        console.log(`\n  Logged out of ${host}\n`)
+      }
+    })
   })
 
 program
@@ -98,13 +222,19 @@ program
     'set the token token to use against the tumu host'
   )
   .action((cmd) => {
-    const host = cmd.host || process.env.TUMU_HOST
+    const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
     if (!host) return hostHelp()
     if (!config.hosts || !config.hosts[host]) return loginHelp(host)
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
-    // TODO: communicate with host and get back app id
-    console.log(`\n  Created new app xxyyzz\n`)
+    const socket = connection(host, token, {
+      open: () => socket.send('new', null),
+      error: socketError,
+      new: (app) => {
+        socket.close()
+        console.log(`\n  Created new app ${app}\n`)
+      }
+    })
   })
 
 program
@@ -123,7 +253,7 @@ program
     'set the token token to use against the tumu host'
   )
   .action((input, cmd) => {
-    const host = cmd.host || process.env.TUMU_HOST
+    const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
     if (!host) return hostHelp()
     const app = cmd.app || process.env.TUMU_APP
     if (!app) return appHelp()
@@ -165,7 +295,7 @@ program
     'set the token token to use against the tumu host'
   )
   .action((cmd) => {
-    const host = cmd.host || process.env.TUMU_HOST
+    const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
     if (!host) return hostHelp()
     const app = cmd.app || process.env.TUMU_APP
     if (!app) return appHelp()
