@@ -56,33 +56,6 @@ const fixHostUrl = (host) => {
   if (host.indexOf('ws://') == -1) return `ws://${host}`
   return host
 }
-const oneshot = (host, token, command, params) => new Promise((resolve, reject) => {
-  let fin = false
-  const socket = new WebSocket(host, { headers: { Token: token }})
-    socket.on('open', (req) => socket.send(JSON.stringify([command, params])))
-    socket.on('error', (err) => {
-      if (fin) return
-      socket.terminate()
-      reject(err)
-    })
-
-    socket.on('message', (data) => {
-      let payload = null
-      try { payload = JSON.parse(data) }
-      catch (e) {
-        socket.terminate()
-        reject('protocol violation')
-        return
-      }
-      if (!Array.isArray(payload) || payload.length != 2 || payload[0] != command) {
-        socket.terminate()
-        reject('protocol violation')
-        return
-      }
-      socket.terminate()
-      resolve(payload[1])
-    })
-})
 const connection = (host, token, callbacks) => {
   let fin = false
   const socket = new WebSocket(host, { headers: { Token: token }})
@@ -118,7 +91,6 @@ const socketError = (err) => {
   if (err.code == 'ECONNREFUSED')
     console.error(`\n  Connection to tumu host refused`)
 
-  console.error()
   console.error(err)
   console.error()
 }
@@ -228,7 +200,7 @@ program
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
     const socket = connection(host, token, {
-      open: () => socket.send('new', null),
+      open: () => socket.send('new'),
       error: socketError,
       new: (app) => {
         socket.close()
@@ -260,23 +232,36 @@ program
     if (!config.hosts || !config.hosts[host]) return loginHelp(host)
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
-    // TODO: communicate with host
+    if (!fs.existsSync(input))
+      return console.error(`\n  Input file not found: ${input}\n`)
+    const code = fs.readFileSync(input, 'utf8')
+    if (!code) return console.error(`\n  Could not read input file: ${input}\n`)
     console.log()
     let count = 1
     process.stdout.write(`  Publishing — ${count}`)
     let handle = setInterval(() => {
       count++
-      if (count == 5) {
-        clearInterval(handle)
-        process.stdout.clearLine()
-        process.stdout.cursorTo(0)
-        console.log(`  Published ${app} to ${host}\n`)
-        return
-      }
       process.stdout.clearLine()
       process.stdout.cursorTo(0)
       process.stdout.write(`  Publishing — ${count}`)
     }, 1000)
+    const socket = connection(host, token, {
+      open: () => socket.send('publish', { app, code }),
+      error: (err) => {
+        socket.close()
+        clearInterval(handle)
+        process.stdout.clearLine()
+        process.stdout.cursorTo(0)
+        socketError(err)
+      },
+      publish: () => {
+        socket.close()
+        clearInterval(handle)
+        process.stdout.clearLine()
+        process.stdout.cursorTo(0)
+        console.log(`  Published ${app}\n`)
+      }
+    })
   })
 
 program
@@ -304,12 +289,11 @@ program
     if (!token) return loginHelp(host)
     // TODO: communicate with host
     console.log(`\nStreaming logs from ${app}...\n`)
-    let count = 1
-    console.log(count)
-    setInterval(() => {
-      count++
-      console.log(count)
-    }, 1000)
+    const socket = connection(host, token, {
+      open: () => socket.send('logs'),
+      error: socketError,
+      log: console.log
+    })
   })
 
 program
