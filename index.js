@@ -301,9 +301,9 @@ program
     // TODO: communicate with host
     console.log(`\nStreaming logs from ${app}...\n`)
     const socket = connection(host, token, {
-      open: () => socket.send('logs'),
+      open: () => socket.send('logs', app),
       error: socketError,
-      log: console.log
+      log: (args) => console.log(...args)
     })
   })
 
