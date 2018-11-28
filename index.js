@@ -1,6 +1,8 @@
+#!/usr/bin/env node
+
 require('dotenv').config()
 const program = require('commander')
-const version = require('../package.json').version
+const version = require('./package.json').version
 const { homedir } = require('os')
 const { join } = require('path')
 const fs = require('fs')
@@ -42,13 +44,20 @@ const hostHelp = () => console.error(`
 const appHelp = () => console.error(`
   The app is not specified — please fix by:
 
-  1. passing --app to this command
+  1. Passing --app to this command
   2. Specifying a TUMU_APP environment variable
   3. Or setting TUMU_APP in an .env file
 
 
   If you need a new app run \`tumu new\`
 
+`)
+const inputHelp = () => console.error(`
+  An input file is not specified — please fix by:
+
+  1. Passing a file path to this command
+  2. Specifying a TUMU_INPUT environment variable
+  3. Or setting TUMU_INPUT in an .env file
 `)
 
 const fixHostUrl = (host) => {
@@ -232,6 +241,8 @@ program
     if (!config.hosts || !config.hosts[host]) return loginHelp(host)
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
+    if (!input) input = process.env.TUMU_FILE
+    if (!input) return inputHelp()
     if (!fs.existsSync(input))
       return console.error(`\n  Input file not found: ${input}\n`)
     const code = fs.readFileSync(input, 'utf8')
