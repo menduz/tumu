@@ -68,29 +68,29 @@ const fixHostUrl = (host) => {
 const connection = (host, token, callbacks) => {
   let fin = false
   const socket = new WebSocket(host, { headers: { Token: token }})
-    socket.on('open', () => callbacks.open())
-    socket.on('error', (err) => {
-      if (fin) return
+  socket.on('open', () => callbacks.open())
+  socket.on('error', (err) => {
+    if (fin) return
+    socket.terminate()
+    callbacks.socketError(err)
+  })
+  socket.on('message', (data) => {
+    let payload = null
+    try { payload = JSON.parse(data) }
+    catch (e) {
       socket.terminate()
-      callbacks.error(err)
-    })
-
-    socket.on('message', (data) => {
-      let payload = null
-      try { payload = JSON.parse(data) }
-      catch (e) {
-        socket.terminate()
-        callbacks.error('protocol violation')
-        return
-      }
-      if (!Array.isArray(payload) || payload.length != 2) {
-        socket.terminate()
-        callbacks.error('protocol violation')
-        return
-      }
-      if (callbacks[payload[0]]) callbacks[payload[0]](payload[1])
-      else callbacks.error('protocol violation')
-    })
+      callbacks.socketError('protocol violation')
+      return
+    }
+    if (!Array.isArray(payload) || payload.length != 2) {
+      socket.terminate()
+      callbacks.socketError('protocol violation')
+      return
+    }
+    if (callbacks[payload[0]]) callbacks[payload[0]](payload[1])
+    else callbacks.socketError('protocol violation')
+  })
+  if (callbacks.close) socket.on('close', callbacks.close)
   return {
     send: (command, params) => socket.send(JSON.stringify([command, params])),
     close: () => socket.terminate()
@@ -131,7 +131,7 @@ program
     getEmailAddress.then((emailAddress) => {
       const socket = connection(host, null, {
         open: () => socket.send('login', emailAddress),
-        error: socketError,
+        socketError: socketError,
         login: (token) => {
           socket.close()
           config.hosts[host].emailAddress = emailAddress
@@ -181,7 +181,7 @@ program
         emailAddress: config.hosts[host].emailAddress,
         token: config.hosts[host].token
       }),
-      error: socketError,
+      socketError: socketError,
       logout: () => {
         socket.close()
         delete config.hosts[host]
@@ -210,11 +210,48 @@ program
     if (!token) return loginHelp(host)
     const socket = connection(host, token, {
       open: () => socket.send('new'),
-      error: socketError,
+      socketError: socketError,
       new: (app) => {
         socket.close()
         console.log(`\n  Created new app ${app}\n`)
       }
+    })
+  })
+
+program
+  .command('domain')
+  .description('link a domain name to an app')
+  .option(
+    '--host <host>',
+    'set the tumu host to connect to e.g. https://example.com:8080/'
+  )
+  .option(
+    '-t,--token <token>',
+    'set the token token to use against the tumu host'
+  )
+  .option(
+    '-a,--app <app>',
+    'set the application to publish'
+  )
+  .action((cmd) => {
+    const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
+    if (!host) return hostHelp()
+    const app = cmd.app || process.env.TUMU_APP
+    if (!app) return appHelp()
+    if (!config.hosts || !config.hosts[host]) return loginHelp(host)
+    const token = cmd.token || config.hosts[host].token
+    if (!token) return loginHelp(host)
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+    rl.question(`\n  Linking a domain name to ${app}\n\n  Type domain name: `, (domain) => {
+      rl.close()
+      const socket = connection(host, token, {
+        open: () => socket.send('domain', { app: app, domain: domain }),
+        socketError: socketError,
+        domain: (app) => {
+          socket.close()
+          console.log(`\n  Domain name linked\n`)
+        }
+      })
     })
   })
 
@@ -226,12 +263,12 @@ program
     'set the tumu host to connect to e.g. https://example.com:8080/'
   )
   .option(
-    '-a,--app <app>',
-    'set the application to publish'
-  )
-  .option(
     '-t,--token <token>',
     'set the token token to use against the tumu host'
+  )
+  .option(
+    '-a,--app <app>',
+    'set the application to publish'
   )
   .action((input, cmd) => {
     const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
@@ -241,7 +278,7 @@ program
     if (!config.hosts || !config.hosts[host]) return loginHelp(host)
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
-    if (!input) input = process.env.TUMU_FILE
+    if (!input) input = process.env.TUMU_FILE || 'index.js'
     if (!input) return inputHelp()
     if (!fs.existsSync(input))
       return console.error(`\n  Input file not found: ${input}\n`)
@@ -283,12 +320,12 @@ program
     'set the tumu host to connect to e.g. https://example.com:8080/'
   )
   .option(
-    '-a,--app <app>',
-    'set the application to publish'
-  )
-  .option(
     '-t,--token <token>',
     'set the token token to use against the tumu host'
+  )
+  .option(
+    '-a,--app <app>',
+    'set the application to publish'
   )
   .action((cmd) => {
     const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
@@ -298,13 +335,19 @@ program
     if (!config.hosts || !config.hosts[host]) return loginHelp(host)
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
-    // TODO: communicate with host
     console.log(`\nStreaming logs from ${app}...\n`)
-    const socket = connection(host, token, {
-      open: () => socket.send('logs', app),
-      error: socketError,
-      log: (args) => console.log(...args)
-    })
+    const attempt = () => {
+      const socket = connection(host, token, {
+        open: () => socket.send('logs', app),
+        socketError: (err) => {
+          if (err.code != 'ECONNREFUSED') socketError(err)
+        },
+        log: (args) => console.log(...args),
+        error: (args) => console.error(...args),
+        close: () => setTimeout(attempt, 200)
+      })
+    }
+    attempt()
   })
 
 program
