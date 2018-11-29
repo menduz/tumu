@@ -278,38 +278,49 @@ program
     if (!config.hosts || !config.hosts[host]) return loginHelp(host)
     const token = cmd.token || config.hosts[host].token
     if (!token) return loginHelp(host)
-    if (!input) input = process.env.TUMU_FILE || 'index.js'
-    if (!input) return inputHelp()
-    if (!fs.existsSync(input))
-      return console.error(`\n  Input file not found: ${input}\n`)
-    const code = fs.readFileSync(input, 'utf8')
-    if (!code) return console.error(`\n  Could not read input file: ${input}\n`)
-    console.log()
-    let count = 1
-    process.stdout.write(`  Publishing — ${count}`)
-    let handle = setInterval(() => {
-      count++
-      process.stdout.clearLine()
-      process.stdout.cursorTo(0)
-      process.stdout.write(`  Publishing — ${count}`)
-    }, 1000)
-    const socket = connection(host, token, {
-      open: () => socket.send('publish', { app, code }),
-      error: (err) => {
-        socket.close()
-        clearInterval(handle)
-        process.stdout.clearLine()
-        process.stdout.cursorTo(0)
-        socketError(err)
-      },
-      publish: () => {
-        socket.close()
-        clearInterval(handle)
-        process.stdout.clearLine()
-        process.stdout.cursorTo(0)
-        console.log(`  Published ${app}\n`)
+    const processCode = (code) => {
+      if (!code) {
+        if (!input) input = process.env.TUMU_FILE || 'index.js'
+        if (!input) return inputHelp()
+        if (!fs.existsSync(input))
+          return console.error(`\n  Input file not found: ${input}\n`)
+        code = fs.readFileSync(input, 'utf8')
+        if (!code) return console.error(`\n  Could not read input file: ${input}\n`)
       }
+      console.log()
+      let count = 1
+      process.stdout.write(`  Publishing — ${count}`)
+      let handle = setInterval(() => {
+        count++
+        process.stdout.clearLine()
+        process.stdout.cursorTo(0)
+        process.stdout.write(`  Publishing — ${count}`)
+      }, 1000)
+      const socket = connection(host, token, {
+        open: () => socket.send('publish', { app, code }),
+        error: (err) => {
+          socket.close()
+          clearInterval(handle)
+          process.stdout.clearLine()
+          process.stdout.cursorTo(0)
+          socketError(err)
+        },
+        publish: () => {
+          socket.close()
+          clearInterval(handle)
+          process.stdout.clearLine()
+          process.stdout.cursorTo(0)
+          console.log(`  Published ${app}\n`)
+        }
+      })
+    }
+    if (process.stdin.isTTY) return processCode()
+    let data = ''
+    process.stdin.on('readable', () => {
+      const chunk = process.stdin.read()
+      if (chunk != null) data += chunk
     })
+    process.stdin.on('end', () => processCode(data))
   })
 
 program

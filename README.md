@@ -36,5 +36,6 @@ tumu --host localhost:8080 logout
 
 # Todo
 - [x] Reconnect logs
-- [ ] Stop / start apps
-- [ ] Code from stdin
+- [x] Stop / start apps
+- [x] Pipe code from stdin
+- [ ] Garbled status messages when piping input from stdin
