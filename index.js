@@ -325,7 +325,7 @@ program
   )
   .option(
     '-a,--app <app>',
-    'set the application to publish'
+    'set the application to log'
   )
   .action((cmd) => {
     const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
@@ -348,6 +348,72 @@ program
       })
     }
     attempt()
+  })
+
+program
+  .command('enable')
+  .description('enable an app')
+  .option(
+    '--host <host>',
+    'set the tumu host to connect to e.g. https://example.com:8080/'
+  )
+  .option(
+    '-t,--token <token>',
+    'set the token token to use against the tumu host'
+  )
+  .option(
+    '-a,--app <app>',
+    'set the application to enable'
+  )
+  .action((cmd) => {
+    const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
+    if (!host) return hostHelp()
+    const app = cmd.app || process.env.TUMU_APP
+    if (!app) return appHelp()
+    if (!config.hosts || !config.hosts[host]) return loginHelp(host)
+    const token = cmd.token || config.hosts[host].token
+    if (!token) return loginHelp(host)
+    const socket = connection(host, token, {
+      open: () => socket.send('enable', app),
+      socketError: socketError,
+      enable: () => {
+        socket.close()
+        console.log(`\n  ${app} enabled\n`)
+      }
+    })
+  })
+
+program
+  .command('disable')
+  .description('disable an app')
+  .option(
+    '--host <host>',
+    'set the tumu host to connect to e.g. https://example.com:8080/'
+  )
+  .option(
+    '-t,--token <token>',
+    'set the token token to use against the tumu host'
+  )
+  .option(
+    '-a,--app <app>',
+    'set the application to disable'
+  )
+  .action((cmd) => {
+    const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
+    if (!host) return hostHelp()
+    const app = cmd.app || process.env.TUMU_APP
+    if (!app) return appHelp()
+    if (!config.hosts || !config.hosts[host]) return loginHelp(host)
+    const token = cmd.token || config.hosts[host].token
+    if (!token) return loginHelp(host)
+    const socket = connection(host, token, {
+      open: () => socket.send('disable', app),
+      socketError: socketError,
+      disable: () => {
+        socket.close()
+        console.log(`\n  ${app} disabled\n`)
+      }
+    })
   })
 
 program
