@@ -298,6 +298,7 @@ program
       }, 1000)
       const socket = connection(host, token, {
         open: () => socket.send('publish', { app, code }),
+        socketError: socketError,
         error: (err) => {
           socket.close()
           clearInterval(handle)
@@ -314,13 +315,14 @@ program
         }
       })
     }
-    if (process.stdin.isTTY) return processCode()
-    let data = ''
-    process.stdin.on('readable', () => {
-      const chunk = process.stdin.read()
-      if (chunk != null) data += chunk
-    })
-    process.stdin.on('end', () => processCode(data))
+    processCode()
+    // if (process.stdin.isTTY) return processCode()
+    // let data = ''
+    // process.stdin.on('readable', () => {
+    //   const chunk = process.stdin.read()
+    //   if (chunk != null) data += chunk
+    // })
+    // process.stdin.on('end', () => processCode(data))
   })
 
 program

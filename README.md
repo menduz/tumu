@@ -34,8 +34,23 @@ tumu --host localhost:8080 --app perky-nana logs
 tumu --host localhost:8080 logout
 ```
 
+Run it locally
+
+```bash
+yarn add global tumu-host
+tumu-local
+```
+
+Or spin up a Tumu host
+
+```bash
+yarn add global tumu-host
+tumu-host
+```
+
 # Todo
-- [x] Reconnect logs
-- [x] Stop / start apps
-- [x] Pipe code from stdin
+- [ ] Fix pipe code from stdin
+- [ ] Documentation and website
+
+# Fixes
 - [ ] Garbled status messages when piping input from stdin
