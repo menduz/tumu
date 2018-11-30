@@ -315,14 +315,16 @@ program
         }
       })
     }
-    processCode()
-    // if (process.stdin.isTTY) return processCode()
-    // let data = ''
-    // process.stdin.on('readable', () => {
-    //   const chunk = process.stdin.read()
-    //   if (chunk != null) data += chunk
-    // })
-    // process.stdin.on('end', () => processCode(data))
+    if (process.stdin.isTTY) return processCode()
+    let handle = setTimeout(processCode, 50)
+    let code = ''
+    process.stdin.on('readable', () => {
+      clearTimeout(handle)
+      handle = null
+      const chunk = process.stdin.read()
+      if (chunk != null) code += chunk
+    })
+    process.stdin.on('end', () => processCode(code))
   })
 
 program
