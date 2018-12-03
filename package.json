@@ -6,7 +6,7 @@
   "author": "Thomas Coats <github@voodoolabs.net>",
   "license": "MIT",
   "bin": {
-    "tumu": "index.js"
+    "tumu": "src/cli.js"
   },
   "dependencies": {
     "commander": "^2.19.0",
