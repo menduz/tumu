@@ -1,11 +1,11 @@
 const program = require('commander')
-const help = require('./help')
-const fixHostUrl = require('./fixhosturl')
-const connection = require('./connection')
+const help = require('../help')
+const fixHostUrl = require('../fixhosturl')
+const connection = require('../connection')
 
 module.exports = (config) => program
-  .command('enable')
-  .description('enable an app')
+  .command('app_disable')
+  .description('disable an app')
   .option(
     '--host <host>',
     'set the tumu host to connect to e.g. https://example.com:8080/'
@@ -16,7 +16,7 @@ module.exports = (config) => program
   )
   .option(
     '-a,--app <app>',
-    'set the application to enable'
+    'set the application to disable'
   )
   .action((cmd) => {
     const host = fixHostUrl(cmd.host || process.env.TUMU_HOST)
@@ -27,10 +27,10 @@ module.exports = (config) => program
     const token = cmd.token || config.hosts[host].token
     if (!token) return help.login(host)
     const socket = connection(host, token, {
-      open: () => socket.send('app_enable', app),
-      app_enable_complete: () => {
+      open: () => socket.send('app_disable', app),
+      app_disable_complete: () => {
         socket.close()
-        console.log(`\n  ${app} enabled\n`)
+        console.log(`\n  ${app} disabled\n`)
       }
     })
   })

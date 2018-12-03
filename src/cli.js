@@ -20,14 +20,27 @@ if (!config.hosts) {
 
 program.version(version)
 
-require('./login')(config, writeConfig)
-require('./logout')(config, writeConfig)
-require('./app-create')(config, writeConfig)
-require('./app-publish')(config, writeConfig)
-require('./app-logs')(config, writeConfig)
-require('./app-enable')(config, writeConfig)
-require('./app-disable')(config, writeConfig)
-require('./domain-map')(config, writeConfig)
+require('./protocol/login')(config, writeConfig)
+require('./protocol/logout')(config, writeConfig)
+
+require('./protocol/status')(config, writeConfig)
+
+require('./protocol/workspace-create')(config, writeConfig)
+require('./protocol/workspace-rename')(config, writeConfig)
+require('./protocol/workspace-delete')(config, writeConfig)
+require('./protocol/workspace-invite')(config, writeConfig)
+require('./protocol/workspace-leave')(config, writeConfig)
+
+require('./protocol/app-create')(config, writeConfig)
+require('./protocol/app-enable')(config, writeConfig)
+require('./protocol/app-disable')(config, writeConfig)
+require('./protocol/app-delete')(config, writeConfig)
+require('./protocol/app-rename')(config, writeConfig)
+require('./protocol/app-logs')(config, writeConfig)
+require('./protocol/app-publish')(config, writeConfig)
+
+require('./protocol/domain-link')(config, writeConfig)
+require('./protocol/domain-unlink')(config, writeConfig)
 
 program
   .command('help [command]')

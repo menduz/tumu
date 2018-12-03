@@ -1,8 +1,8 @@
 const fs = require('fs')
 const program = require('commander')
-const help = require('./help')
-const fixHostUrl = require('./fixhosturl')
-const connection = require('./connection')
+const help = require('../help')
+const fixHostUrl = require('../fixhosturl')
+const connection = require('../connection')
 
 module.exports = (config) => program
   .command('publish [input]')

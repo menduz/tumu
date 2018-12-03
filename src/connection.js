@@ -3,8 +3,11 @@ const WebSocket = require('ws')
 const socketError = (err) => {
   if (err.code == 'ECONNREFUSED')
     console.error(`\n  Connection to tumu host refused`)
+  else
+    console.error()
 
-  console.error(err)
+
+  console.error(` `, err)
   console.error()
 }
 
@@ -32,7 +35,11 @@ module.exports = (host, token, callbacks) => {
       return
     }
     if (callbacks[payload[0]]) callbacks[payload[0]](payload[1])
-    else callbacks.socketError('protocol violation')
+    else if (payload[0] == 'error') {
+      socket.terminate()
+      callbacks.socketError(payload[1])
+    }
+    else callbacks.socketError(`callback not found ${payload[0]}`)
   })
   if (callbacks.close) socket.on('close', callbacks.close)
   return {

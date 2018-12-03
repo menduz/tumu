@@ -1,8 +1,8 @@
 const program = require('commander')
 const readline = require('readline')
-const help = require('./help')
-const fixHostUrl = require('./fixhosturl')
-const connection = require('./connection')
+const help = require('../help')
+const fixHostUrl = require('../fixhosturl')
+const connection = require('../connection')
 
 module.exports = (config, writeConfig) => program
   .command('login [host]')
