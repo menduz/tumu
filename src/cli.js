@@ -37,6 +37,7 @@ require('./protocol/app-disable')(config, writeConfig)
 require('./protocol/app-delete')(config, writeConfig)
 require('./protocol/app-rename')(config, writeConfig)
 require('./protocol/app-logs')(config, writeConfig)
+require('./protocol/app-code')(config, writeConfig)
 require('./protocol/app-publish')(config, writeConfig)
 
 require('./protocol/domain-link')(config, writeConfig)
