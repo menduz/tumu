@@ -30,6 +30,7 @@ require('./protocol/workspace-rename')(config, writeConfig)
 require('./protocol/workspace-delete')(config, writeConfig)
 require('./protocol/workspace-invite')(config, writeConfig)
 require('./protocol/workspace-leave')(config, writeConfig)
+require('./protocol/workspace-status')(config, writeConfig)
 
 require('./protocol/app-create')(config, writeConfig)
 require('./protocol/app-enable')(config, writeConfig)

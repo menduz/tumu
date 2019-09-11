@@ -9,8 +9,8 @@
     "tumu": "src/cli.js"
   },
   "dependencies": {
-    "commander": "^2.19.0",
-    "dotenv": "^6.1.0",
-    "ws": "^6.1.2"
+    "commander": "^3.0.1",
+    "dotenv": "^8.1.0",
+    "ws": "^7.1.2"
   }
 }
